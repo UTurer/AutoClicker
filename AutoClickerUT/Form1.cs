@@ -125,11 +125,12 @@ namespace AutoClickerUT
         {
             int x = System.Convert.ToInt32(textBox1.Text);
             int y = System.Convert.ToInt32(textBox2.Text);
-            int w = 15;
+            int w = 30;
             Graphics g = Graphics.FromHwnd(IntPtr.Zero);
             Rectangle mouseNewRect = new Rectangle(new Point(x-w/2, y-w/2), new Size(w, w));
             g.FillRectangle(new SolidBrush(Color.Magenta), mouseNewRect);
-            //System.Threading.Thread.Sleep(50);
+
+            Cursor.Position = new System.Drawing.Point(x, y);
         }
 
         private void timer1_Tick(object sender, EventArgs e)
@@ -138,6 +139,7 @@ namespace AutoClickerUT
             if(timer1Duration == 0)
             {
                 timer1.Enabled = false;
+                button2_Click(null, null);
             }
 
             //set cursor position to memorized location
@@ -161,6 +163,12 @@ namespace AutoClickerUT
             label10.Text = clickCounter.ToString();
 
             progressBar1.Value = clickCounter * timer1.Interval;
+
+            DateTime dateTime1 = DateTime.Now;
+            DateTime dateTime2 = dateTime1.AddMilliseconds(timer1.Interval);
+            label13.Text = dateTime1.ToString();
+            label14.Text = dateTime2.ToString();
+
         }
 
         private void Form1_Load(object sender, EventArgs e)
@@ -285,6 +293,7 @@ namespace AutoClickerUT
             {
                 timer1.Enabled = false;
                 button2.Text = "BAŞLA";
+                label16.Text = "Durduruldu";
                 return;
             }
 
@@ -370,6 +379,7 @@ namespace AutoClickerUT
             progressBar1.Value = 0;
 
             button2.Text = "DURDUR";
+            label16.Text = "Çalışıyor";
             timer1.Enabled = true;
         }
     }
