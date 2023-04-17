@@ -1,5 +1,7 @@
 ﻿using System.Diagnostics;
 using System.Runtime.InteropServices;
+using System.Runtime.Intrinsics.X86;
+using static AutoClickerUT.Form1;
 
 namespace AutoClickerUT
 {
@@ -108,13 +110,75 @@ namespace AutoClickerUT
             }
         }
 
+        public class LowLevelMouseHook
+        {
+            private const int WH_MOUSE_LL = 14;
+            private const int WM_LBUTTONDOWN = 0x0201;
+            private const int WM_LBUTTONUP = 0x0202;
 
+            [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
+            private static extern IntPtr SetWindowsHookEx(int idHook, LowLevelMouseProc lpfn, IntPtr hMod, uint dwThreadId);
 
+            [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
+            [return: MarshalAs(UnmanagedType.Bool)]
+            private static extern bool UnhookWindowsHookEx(IntPtr hhk);
+
+            [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
+            private static extern IntPtr CallNextHookEx(IntPtr hhk, int nCode, IntPtr wParam, IntPtr lParam);
+
+            [DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
+            private static extern IntPtr GetModuleHandle(string lpModuleName);
+
+            public delegate IntPtr LowLevelMouseProc(int nCode, IntPtr wParam, IntPtr lParam);
+
+            public event EventHandler OnLMousePressed;
+            public event EventHandler OnLMouseUnpressed;
+
+            private LowLevelMouseProc _proc;
+            private IntPtr _hookID = IntPtr.Zero;
+
+            public LowLevelMouseHook()
+            {
+                _proc = HookCallback;
+            }
+
+            public void HookMouse()
+            {
+                _hookID = SetHook(_proc);
+            }
+
+            public void UnHookMouse()
+            {
+                UnhookWindowsHookEx(_hookID);
+            }
+
+            private IntPtr SetHook(LowLevelMouseProc proc)
+            {
+                using (Process curProcess = Process.GetCurrentProcess())
+                using (ProcessModule curModule = curProcess.MainModule)
+                {
+                    return SetWindowsHookEx(WH_MOUSE_LL, proc, GetModuleHandle(curModule.ModuleName), 0);
+                }
+            }
+
+            private IntPtr HookCallback(int nCode, IntPtr wParam, IntPtr lParam)
+            {
+                if (nCode >= 0 && wParam == (IntPtr)WM_LBUTTONDOWN)
+                {
+                    OnLMousePressed.Invoke(this, EventArgs.Empty);
+                }
+                else if (nCode >= 0 && wParam == (IntPtr)WM_LBUTTONUP)
+                {
+                    OnLMouseUnpressed.Invoke(this, EventArgs.Empty);
+                }
+
+                return CallNextHookEx(_hookID, nCode, wParam, lParam);
+            }
+        }
 
         int timer1Duration = 0;
         int curX=0, curY=0;
-
-
+        LowLevelMouseHook lowLevelMouseHook1;
 
         public Form1()
         {
@@ -162,7 +226,10 @@ namespace AutoClickerUT
             clickCounter = clickCounter+ 1;
             label10.Text = clickCounter.ToString();
 
-            progressBar1.Value = clickCounter * timer1.Interval;
+            if(!checkBox1.Checked)
+            {
+                progressBar1.Value = clickCounter * timer1.Interval;
+            }
 
             DateTime dateTime1 = DateTime.Now;
             DateTime dateTime2 = dateTime1.AddMilliseconds(timer1.Interval);
@@ -180,6 +247,10 @@ namespace AutoClickerUT
             comboBox1.SelectedIndex = Properties.Settings.Default.comboBox1;
             comboBox2.SelectedIndex = Properties.Settings.Default.comboBox2;
             label10.Text = "0";
+            label16.Text = "Durduruldu";
+            label13.Text = "";
+            label14.Text = "";
+            label17.Visible = false;
 
             LowLevelKeyboardHook lowLevelKeyboardHook1 = new LowLevelKeyboardHook();
             lowLevelKeyboardHook1.OnKeyPressed += lowLevelKeyboardHook1_OnKeyPressed;
@@ -224,6 +295,23 @@ namespace AutoClickerUT
             //}
         }
 
+        void lowLevelMouseHook1_OnLMousePressed(object sender, EventArgs e)
+        {
+            lowLevelMouseHook1.UnHookMouse();
+
+            System.Drawing.Point point1 = System.Windows.Forms.Cursor.Position;
+            textBox1.Text = point1.X.ToString();
+            textBox2.Text = point1.Y.ToString();
+
+            label17.Visible = false;
+        }
+
+        void lowLevelMouseHook1_OnLMouseUnpressed(object sender, EventArgs e)
+        {
+
+        }
+
+
         private void Form1_FormClosing(object sender, FormClosingEventArgs e)
         {
             Properties.Settings.Default.textBox1 = textBox1.Text;
@@ -258,6 +346,8 @@ namespace AutoClickerUT
             }
 
             hScrollBar1.Value = int1;
+
+            label18.Text = "X=" + textBox1.Text.ToString() + ", Y=" + textBox2.Text.ToString();
         }
 
         private void textBox2_TextChanged(object sender, EventArgs e)
@@ -274,6 +364,8 @@ namespace AutoClickerUT
             }
 
             hScrollBar2.Value = int1;
+
+            label18.Text = "X=" + textBox1.Text.ToString() + ", Y=" + textBox2.Text.ToString();
         }
 
         private void Form1_Move(object sender, EventArgs e)
@@ -285,6 +377,30 @@ namespace AutoClickerUT
             hScrollBar1.Maximum = ScreenWidth + hScrollBar1.LargeChange - 1;
             hScrollBar2.Minimum = 0;
             hScrollBar2.Maximum = ScreenHeight + hScrollBar2.LargeChange - 1;
+        }
+
+        private void button3_Click(object sender, EventArgs e)
+        {
+            label17.Visible = true;
+
+            lowLevelMouseHook1 = new LowLevelMouseHook();
+            lowLevelMouseHook1.OnLMousePressed += lowLevelMouseHook1_OnLMousePressed;
+            lowLevelMouseHook1.OnLMouseUnpressed += lowLevelMouseHook1_OnLMouseUnpressed;
+            lowLevelMouseHook1.HookMouse();
+        }
+
+        private void checkBox1_CheckedChanged(object sender, EventArgs e)
+        {
+            if(checkBox1.Checked)
+            {
+                textBox4.Enabled = false;
+                comboBox2.Enabled = false;
+            }
+            else
+            {
+                textBox4.Enabled = true;
+                comboBox2.Enabled = true;
+            }
         }
 
         private void button2_Click(object sender, EventArgs e)
@@ -321,9 +437,6 @@ namespace AutoClickerUT
                 return;
             }
 
-            textBox3.Text = int1.ToString();
-            textBox4.Text = int2.ToString();
-
             if (comboBox1.SelectedIndex == 0) //milisecond
             {
                 //do nothing
@@ -345,26 +458,33 @@ namespace AutoClickerUT
                 int1 = int1 * 24 * 60 * 60 * 1000;
             }
 
-            if (comboBox2.SelectedIndex == 0) //milisecond
+            textBox3.Text = int1.ToString();
+            if (!checkBox1.Checked)
             {
-                //do nothing
+                textBox4.Text = int2.ToString();
+
+                if (comboBox2.SelectedIndex == 0) //milisecond
+                {
+                    //do nothing
+                }
+                else if (comboBox2.SelectedIndex == 1) //second
+                {
+                    int2 = int2 * 1000;
+                }
+                else if (comboBox2.SelectedIndex == 2) //minute
+                {
+                    int2 = int2 * 60 * 1000;
+                }
+                else if (comboBox2.SelectedIndex == 3) //hour
+                {
+                    int2 = int2 * 60 * 60 * 1000;
+                }
+                else if (comboBox2.SelectedIndex == 4) //day
+                {
+                    int2 = int2 * 24 * 60 * 60 * 1000;
+                }
             }
-            else if (comboBox2.SelectedIndex == 1) //second
-            {
-                int2 = int2 * 1000;
-            }
-            else if (comboBox2.SelectedIndex == 2) //minute
-            {
-                int2 = int2 * 60 * 1000;
-            }
-            else if (comboBox2.SelectedIndex == 3) //hour
-            {
-                int2 = int2 * 60 * 60 * 1000;
-            }
-            else if (comboBox2.SelectedIndex == 4) //day
-            {
-                int2 = int2 * 24 * 60 * 60 * 1000;
-            }
+
 
             timer1.Interval = int1;
             this.timer1Duration = int2;
@@ -375,7 +495,15 @@ namespace AutoClickerUT
             label10.Text = clickCounter.ToString();
 
             progressBar1.Minimum = 0;
-            progressBar1.Maximum = timer1Duration;
+            if (checkBox1.Checked)
+            {
+                progressBar1.Maximum = 100;
+            }
+            else
+            {
+                progressBar1.Maximum = timer1Duration;
+            }
+            
             progressBar1.Value = 0;
 
             button2.Text = "DURDUR";
